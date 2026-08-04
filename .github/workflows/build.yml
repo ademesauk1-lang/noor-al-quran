@@ -19,23 +19,35 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Unzip and Build
+    - name: Unzip and Find Project
       run: |
-        ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" | head -n 1)
-        echo "Unzipping $ZIP_FILE..."
-        unzip "$ZIP_FILE" -d unzipped_project
+        mkdir -p unzipped_project
+        for zip in *.zip; do
+          if [ -f "$zip" ]; then
+            echo "Unzipping $zip..."
+            unzip -q "$zip" -d unzipped_project
+          fi
+        done
+
+    - name: Build with Gradle
+      run: |
+        # Find gradlew automatically no matter where it is inside the zip
+        GRADLEW_PATH=$(find unzipped_project -name "gradlew" | head -n 1)
+        if [ -z "$GRADLEW_PATH" ]; then
+          echo "Error: gradlew not found!"
+          exit 1
+        fi
         
-        cd unzipped_project
-        cd $(ls -d */ | head -n 1)
+        PROJECT_DIR=$(dirname "$GRADLEW_PATH")
+        echo "Found project directory at: $PROJECT_DIR"
         
+        cd "$PROJECT_DIR"
         chmod +x gradlew
         ./gradlew assembleDebug
-        
-        mkdir -p ../../apk_output
-        find . -name "app-debug.apk" -exec cp {} ../../apk_output/ \;
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: app-debug-apk
-        path: apk_output/app-debug.apk
+        path: |
+          **/app/build/outputs/apk/debug/*.apk
