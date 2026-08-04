@@ -31,31 +31,33 @@ jobs:
 
     - name: Build with Gradle
       run: |
-        GRADLEW_PATH=$(find unzipped_project -name "gradlew" | head -n 1)
-        
-        if [ -z "$GRADLEW_PATH" ]; then
-          echo "gradlew not found! Generating with modern Gradle..."
+        # Find the root project directory by looking for settings.gradle first
+        ROOT_DIR=$(find unzipped_project -name "settings.gradle" -o -name "settings.gradle.kts" | head -n 1)
+        if [ -n "$ROOT_DIR" ]; then
+          PROJECT_DIR=$(dirname "$ROOT_DIR")
+        else
+          # Fallback if no settings.gradle exists
           BUILD_GRADLE=$(find unzipped_project -name "build.gradle" -o -name "build.gradle.kts" | head -n 1)
           if [ -z "$BUILD_GRADLE" ]; then
-            echo "Error: build.gradle not found either!"
+            echo "Error: Could not find any build.gradle or settings.gradle file!"
             exit 1
           fi
           PROJECT_DIR=$(dirname "$BUILD_GRADLE")
-          cd "$PROJECT_DIR"
-          
-          # Download modern Gradle (8.4) that supports Java 17
-          wget -q https://services.gradle.org/distributions/gradle-8.4-bin.zip
-          unzip -q gradle-8.4-bin.zip
-          ./gradle-8.4/bin/gradle wrapper
-          
-          chmod +x gradlew
-          ./gradlew assembleDebug
-        else
-          PROJECT_DIR=$(dirname "$GRADLEW_PATH")
-          cd "$PROJECT_DIR"
-          chmod +x gradlew
-          ./gradlew assembleDebug
         fi
+        
+        echo "Found project root directory at: $PROJECT_DIR"
+        cd "$PROJECT_DIR"
+        
+        # Check if gradlew exists, if not generate with Gradle 8.7
+        if [ ! -f "gradlew" ]; then
+          echo "gradlew not found! Generating with modern Gradle 8.7..."
+          wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip
+          unzip -q gradle-8.7-bin.zip
+          ./gradle-8.7/bin/gradle wrapper
+        fi
+        
+        chmod +x gradlew
+        ./gradlew assembleDebug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
